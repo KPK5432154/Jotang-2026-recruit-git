@@ -1,2 +1,2 @@
-# Jotang-2026-recruit
+# Jotang-2026-recruit-git
 这是一个用于完成招新题的仓库。 this is a repository for recruitment tasks.
