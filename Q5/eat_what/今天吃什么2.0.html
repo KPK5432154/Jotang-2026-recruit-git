@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>今天吃什么</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:#1a1a2e;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px;overflow-x:hidden}
+
+  h1{font-size:22px;margin:12px 0 16px;font-weight:600;letter-spacing:1px;background:linear-gradient(90deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+  /* ========== 菜单栏 ========== */
+  .menu-bar{width:min(88vw,380px);display:flex;gap:8px;margin-bottom:14px}
+  .menu-select{flex:1;min-width:0;background:#252540;border:1px solid #3a3a55;border-radius:12px;padding:12px 40px 12px 14px;color:#fff;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23f7971e' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center}
+  .menu-select:focus{border-color:#f7971e}
+  .menu-btn{width:46px;height:46px;border-radius:12px;background:#252540;border:1px solid #3a3a55;color:#f7971e;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+  .menu-btn:active{transform:scale(.92);background:#3a3a55}
+
+  /* ========== 轮盘 ========== */
+  .wheel-container{position:relative;width:min(88vw,360px);height:min(88vw,360px);margin-bottom:20px}
+  canvas{width:100%;height:100%;display:block;border-radius:50%;box-shadow:0 0 30px rgba(247,151,30,.3);transition:transform 4s cubic-bezier(.17,.67,.12,1)}
+  .pointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:26px solid #ff4757;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));z-index:10}
+  .spin-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff6b6b,#ee5a24);border:4px solid #fff;color:#fff;font-size:16px;font-weight:700;cursor:pointer;z-index:10;box-shadow:0 4px 15px rgba(238,90,36,.6);transition:transform .15s;display:flex;align-items:center;justify-content:center}
+  .spin-btn:active{transform:translate(-50%,-50%) scale(.92)}
+  .spin-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ========== 结果弹窗 ========== */
+  .result-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+  .result-overlay.show{display:flex;animation:fadeIn .3s}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .result-card{background:linear-gradient(145deg,#2d2d44,#1f1f33);border-radius:20px;padding:36px 40px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);animation:popIn .4s cubic-bezier(.17,.67,.3,1.3);max-width:80vw}
+  @keyframes popIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .result-label{font-size:14px;color:#aaa;margin-bottom:12px}
+  .result-food{font-size:32px;font-weight:700;background:linear-gradient(90deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;word-break:break-all}
+  .result-prob{font-size:13px;color:#888;margin-bottom:20px}
+  .result-close{background:linear-gradient(145deg,#ff6b6b,#ee5a24);border:none;color:#fff;padding:12px 36px;border-radius:30px;font-size:16px;font-weight:600;cursor:pointer}
+  .result-close:active{transform:scale(.95)}
+
+  /* ========== 食物编辑区 ========== */
+  .editor{width:min(88vw,380px);background:#252540;border-radius:16px;padding:16px;margin-bottom:12px}
+  .editor-title{font-size:13px;color:#888;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .editor-title .hint{font-size:11px;color:#666}
+  .add-row{display:flex;gap:8px;margin-bottom:12px}
+  .add-row input{flex:1;min-width:0;background:#1a1a2e;border:1px solid #3a3a55;border-radius:10px;padding:10px 14px;color:#fff;font-size:15px;outline:none;transition:border-color .2s}
+  .add-row input:focus{border-color:#f7971e}
+  .add-row input::placeholder{color:#555}
+  .add-row button{background:linear-gradient(145deg,#f7971e,#ffd200);border:none;border-radius:10px;padding:0 18px;color:#1a1a2e;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .add-row button:active{transform:scale(.95)}
+  .food-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto}
+  .food-item{display:flex;align-items:center;gap:8px;background:#1a1a2e;border:1px solid #3a3a55;border-radius:12px;padding:8px 10px}
+  .food-name{flex:1;min-width:0;font-size:15px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .food-percent{font-size:12px;color:#f7971e;font-weight:600;min-width:42px;text-align:right}
+  .weight-controls{display:flex;align-items:center;gap:4px}
+  .weight-btn{width:26px;height:26px;border-radius:8px;background:#2d2d44;border:1px solid #3a3a55;color:#f7971e;font-size:16px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .weight-btn:active{transform:scale(.9);background:#3a3a55}
+  .weight-value{min-width:26px;text-align:center;font-size:14px;color:#fff;font-weight:600}
+  .del{width:26px;height:26px;border-radius:8px;background:#ff4757;border:none;color:#fff;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+  .del:active{transform:scale(.9)}
+  .empty-hint{color:#555;font-size:13px;text-align:center;padding:12px 0;width:100%}
+  .food-list::-webkit-scrollbar{width:4px}
+  .food-list::-webkit-scrollbar-thumb{background:#3a3a55;border-radius:4px}
+
+  /* ========== 全屏面板（菜单管理） ========== */
+  .panel{position:fixed;inset:0;background:#1a1a2e;z-index:200;display:none;flex-direction:column;padding:16px;overflow-y:auto}
+  .panel.show{display:flex;animation:slideUp .3s}
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-top:8px}
+  .panel-header h2{font-size:20px;font-weight:600}
+  .panel-header .close-btn{width:38px;height:38px;border-radius:10px;background:#252540;border:1px solid #3a3a55;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+  .panel-header .close-btn:active{transform:scale(.92)}
+
+  .menu-card{background:#252540;border:1px solid #3a3a55;border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;transition:border-color .2s}
+  .menu-card.active{border-color:#f7971e;background:#2a2a48}
+  .menu-card .info{flex:1;min-width:0;cursor:pointer}
+  .menu-card .info .nm{font-size:16px;font-weight:600;color:#fff;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .menu-card .info .cnt{font-size:12px;color:#888}
+  .menu-card.active .info .nm{color:#f7971e}
+  .menu-card .actions{display:flex;gap:6px;flex-shrink:0}
+  .icon-btn{width:36px;height:36px;border-radius:10px;background:#1a1a2e;border:1px solid #3a3a55;color:#f7971e;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+  .icon-btn:active{transform:scale(.9);background:#3a3a55}
+  .icon-btn.danger{color:#ff4757}
+  .icon-btn:disabled{opacity:.35;cursor:not-allowed}
+
+  .new-menu-btn{width:100%;padding:16px;border-radius:14px;background:linear-gradient(145deg,#f7971e,#ffd200);border:none;color:#1a1a2e;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px}
+  .new-menu-btn:active{transform:scale(.98)}
+
+  /* ========== 弹窗（输入/确认） ========== */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:300;backdrop-filter:blur(4px);padding:20px}
+  .modal-overlay.show{display:flex;animation:fadeIn .25s}
+  .modal{background:linear-gradient(145deg,#2d2d44,#1f1f33);border-radius:20px;padding:24px;width:min(88vw,340px);box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);animation:popIn .35s cubic-bezier(.17,.67,.3,1.3)}
+  .modal h3{font-size:17px;margin-bottom:16px;text-align:center;color:#fff}
+  .modal input{width:100%;background:#1a1a2e;border:1px solid #3a3a55;border-radius:10px;padding:12px 14px;color:#fff;font-size:16px;outline:none;margin-bottom:16px}
+  .modal input:focus{border-color:#f7971e}
+  .modal input::placeholder{color:#555}
+  .modal p{font-size:14px;color:#aaa;text-align:center;margin-bottom:16px;line-height:1.5}
+  .modal-btns{display:flex;gap:10px}
+  .modal-btns button{flex:1;padding:13px;border-radius:10px;border:none;font-size:15px;font-weight:600;cursor:pointer}
+  .modal-btns .cancel{background:#1a1a2e;color:#aaa;border:1px solid #3a3a55}
+  .modal-btns .confirm{background:linear-gradient(145deg,#f7971e,#ffd200);color:#1a1a2e}
+  .modal-btns .confirm.danger{background:linear-gradient(145deg,#ff6b6b,#ee5a24);color:#fff}
+  .modal-btns button:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+
+  <h1>🍽️ 今天吃什么</h1>
+
+  <!-- 菜单切换栏 -->
+  <div class="menu-bar">
+    <select class="menu-select" id="menuSelect"></select>
+    <button class="menu-btn" id="menuManageBtn" aria-label="管理菜单">☰</button>
+  </div>
+
+  <!-- 转盘 -->
+  <div class="wheel-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="600" height="600"></canvas>
+    <button class="spin-btn" id="spinBtn">开始</button>
+  </div>
+
+  <!-- 食物编辑 -->
+  <div class="editor">
+    <div class="editor-title">
+      <span id="editorMenuName">我的菜单</span>
+      <span class="hint" id="count">0 项</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="foodInput" placeholder="输入食物名称..." maxlength="12">
+      <button id="addBtn">添加</button>
+    </div>
+    <div class="food-list" id="foodList"></div>
+  </div>
+
+  <!-- 结果弹窗 -->
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-label">🎉 今天就吃</div>
+      <div class="result-food" id="resultFood"></div>
+      <div class="result-prob" id="resultProb"></div>
+      <button class="result-close" id="resultClose">好的！</button>
+    </div>
+  </div>
+
+  <!-- 菜单管理面板（全屏） -->
+  <div class="panel" id="menuPanel">
+    <div class="panel-header">
+      <h2>我的菜单</h2>
+      <button class="close-btn" id="menuPanelClose">×</button>
+    </div>
+    <div id="menuCards"></div>
+    <button class="new-menu-btn" id="newMenuBtn">+ 新建菜单</button>
+  </div>
+
+  <!-- 通用输入弹窗 -->
+  <div class="modal-overlay" id="inputModal">
+    <div class="modal">
+      <h3 id="inputModalTitle">新建菜单</h3>
+      <input type="text" id="inputModalField" placeholder="输入名称..." maxlength="16">
+      <div class="modal-btns">
+        <button class="cancel" id="inputModalCancel">取消</button>
+        <button class="confirm" id="inputModalConfirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认弹窗 -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle">确认删除？</h3>
+      <p id="confirmMsg"></p>
+      <div class="modal-btns">
+        <button class="cancel" id="confirmCancel">取消</button>
+        <button class="confirm danger" id="confirmOk">删除</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+'use strict';
+
+// ============================================================
+// 数据模型
+// state = {
+//   currentMenuId: 'xxx',
+//   menus: [ { id, name, foods: [{name, weight}] } ]
+// }
+// ============================================================
+var STORAGE_KEY = 'what_to_eat_menus_v4';
+var MAX_WEIGHT = 10;
+var MAX_FOODS  = 20;
+var MAX_MENUS  = 20;
+
+var DEFAULT_FOODS = [
+  {name:'火锅',weight:1},{name:'麻辣烫',weight:1},{name:'炸鸡',weight:1},{name:'汉堡',weight:1},
+  {name:'拉面',weight:1},{name:'炒饭',weight:1},{name:'饺子',weight:1},{name:'沙拉',weight:1}
+];
+
+var state = loadState();
+var spinning = false;
+var currentRotation = 0;
+
+// ---------------- DOM ----------------
+var canvas        = document.getElementById('wheel');
+var ctx           = canvas.getContext('2d');
+var spinBtn       = document.getElementById('spinBtn');
+var foodInput     = document.getElementById('foodInput');
+var addBtn        = document.getElementById('addBtn');
+var foodList      = document.getElementById('foodList');
+var countEl       = document.getElementById('count');
+var editorMenuName= document.getElementById('editorMenuName');
+var menuSelect    = document.getElementById('menuSelect');
+var menuManageBtn = document.getElementById('menuManageBtn');
+
+var resultOverlay = document.getElementById('resultOverlay');
+var resultFood    = document.getElementById('resultFood');
+var resultProb    = document.getElementById('resultProb');
+var resultClose   = document.getElementById('resultClose');
+
+var menuPanel     = document.getElementById('menuPanel');
+var menuPanelClose= document.getElementById('menuPanelClose');
+var menuCards     = document.getElementById('menuCards');
+var newMenuBtn    = document.getElementById('newMenuBtn');
+
+var inputModal       = document.getElementById('inputModal');
+var inputModalTitle  = document.getElementById('inputModalTitle');
+var inputModalField  = document.getElementById('inputModalField');
+var inputModalCancel = document.getElementById('inputModalCancel');
+var inputModalConfirm= document.getElementById('inputModalConfirm');
+
+var confirmModal  = document.getElementById('confirmModal');
+var confirmTitle  = document.getElementById('confirmTitle');
+var confirmMsg    = document.getElementById('confirmMsg');
+var confirmCancel = document.getElementById('confirmCancel');
+var confirmOk     = document.getElementById('confirmOk');
+
+var SIZE=600, CENTER=300, RADIUS=290;
+var COLORS = ['#FF6B6B','#4ECDC4','#FFD93D','#6C5CE7','#00B894','#FD79A8','#E17055','#0984E3','#00CEC9','#FDCB6E','#E84393','#55EFC4','#74B9FF','#A29BFE','#FF7675','#81ECEC'];
+
+// ============================================================
+// 存储
+// ============================================================
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+function loadState(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      var s = JSON.parse(raw);
+      if(s && Array.isArray(s.menus) && s.menus.length > 0){
+        s.menus = s.menus.map(function(m){
+          return {
+            id:   m.id || uid(),
+            name: m.name || '未命名菜单',
+            foods: Array.isArray(m.foods) ? m.foods.map(function(f){
+              if(typeof f === 'string') return {name:f, weight:1};
+              return {name:f.name, weight:Number(f.weight)||1};
+            }) : []
+          };
+        });
+        if(!s.currentMenuId || !s.menus.some(function(m){return m.id===s.currentMenuId})){
+          s.currentMenuId = s.menus[0].id;
+        }
+        return s;
+      }
+    }
+  }catch(e){}
+
+  // 兼容旧数据 v2/v3
+  var migrated = null;
+  ['what_to_eat_foods_v2','what_to_eat_foods'].forEach(function(k){
+    if(migrated) return;
+    try{
+      var oldRaw = localStorage.getItem(k);
+      if(oldRaw){
+        var arr = JSON.parse(oldRaw);
+        if(Array.isArray(arr) && arr.length>0){
+          migrated = arr.map(function(f){
+            if(typeof f === 'string') return {name:f, weight:1};
+            return {name:f.name, weight:Number(f.weight)||1};
+          });
+        }
+      }
+    }catch(e){}
+  });
+
+  var first = {
+    id: uid(),
+    name: '默认菜单',
+    foods: migrated || DEFAULT_FOODS.map(function(f){return {name:f.name, weight:f.weight}})
+  };
+  return { currentMenuId: first.id, menus: [first] };
+}
+
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+// ============================================================
+// 当前菜单快捷方式
+// ============================================================
+function getCurrentMenu(){
+  return state.menus.find(function(m){return m.id === state.currentMenuId}) || state.menus[0];
+}
+function getCurrentFoods(){ return getCurrentMenu().foods; }
+function getTotalWeight(){
+  return getCurrentFoods().reduce(function(s,f){return s+f.weight},0);
+}
+function getPercent(i){
+  var t = getTotalWeight();
+  return t === 0 ? 0 : (getCurrentFoods()[i].weight / t) * 100;
+}
+
+// ============================================================
+// 加权随机
+// ============================================================
+function pickWeighted(){
+  var foods = getCurrentFoods();
+  var total = getTotalWeight();
+  var r = Math.random() * total;
+  for(var i=0;i<foods.length;i++){
+    r -= foods[i].weight;
+    if(r < 0) return i;
+  }
+  return foods.length - 1;
+}
+
+// ============================================================
+// 绘制转盘
+// ============================================================
+function drawWheel(){
+  ctx.clearRect(0,0,SIZE,SIZE);
+  var foods = getCurrentFoods();
+  var n = foods.length;
+
+  if(n === 0){
+    ctx.beginPath();ctx.arc(CENTER,CENTER,RADIUS,0,Math.PI*2);
+    ctx.fillStyle='#2d2d44';ctx.fill();
+    ctx.fillStyle='#666';ctx.font='bold 28px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('请添加食物',CENTER,CENTER);
+    return;
+  }
+
+  var total = getTotalWeight();
+  if(total === 0) return;
+
+  var startAngle = -Math.PI/2;
+  for(var i=0;i<n;i++){
+    var ratio = foods[i].weight / total;
+    var arc = ratio * Math.PI * 2;
+    var endAngle = startAngle + arc;
+
+    ctx.beginPath();
+    ctx.moveTo(CENTER,CENTER);
+    ctx.arc(CENTER,CENTER,RADIUS,startAngle,endAngle);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.2)';
+    ctx.lineWidth = 2;ctx.stroke();
+
+    if(arc > 0.25){
+      ctx.save();
+      ctx.translate(CENTER,CENTER);
+      ctx.rotate(startAngle + arc/2);
+      ctx.fillStyle = '#fff';
+      var fs = Math.max(14, Math.min(26, 200*ratio + 12));
+      ctx.font = 'bold ' + fs + 'px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,.5)';
+      ctx.shadowBlur = 3;
+      var text = foods[i].name;
+      if(text.length > 6) text = text.slice(0,6) + '…';
+      ctx.fillText(text, RADIUS - 22, 0);
+      ctx.restore();
+    }
+    startAngle = endAngle;
+  }
+
+  ctx.beginPath();
+  ctx.arc(CENTER,CENTER,RADIUS,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,.3)';
+  ctx.lineWidth=4;ctx.stroke();
+}
+
+// ============================================================
+// 旋转
+// ============================================================
+function spin(){
+  if(spinning || getCurrentFoods().length === 0) return;
+  spinning = true;
+  spinBtn.disabled = true;
+
+  var foods = getCurrentFoods();
+  var targetIndex = pickWeighted();
+  var total = getTotalWeight();
+
+  var accAngle = 0;
+  for(var i=0;i<targetIndex;i++) accAngle += (foods[i].weight/total) * Math.PI * 2;
+  var targetArc = (foods[targetIndex].weight/total) * Math.PI * 2;
+  var centerAngleDeg = (accAngle + targetArc/2) * 180 / Math.PI;
+
+  var baseAngle = 360 - centerAngleDeg;
+  var extraTurns = 5 + Math.floor(Math.random()*3);
+  var jitter = (Math.random()-.5) * (targetArc*180/Math.PI) * .8;
+
+  var currentMod = ((currentRotation % 360) + 360) % 360;
+  var targetMod  = ((baseAngle % 360) + 360) % 360;
+  var delta = targetMod - currentMod;
+  if(delta < 0) delta += 360;
+
+  var totalRotation = currentRotation + extraTurns*360 + delta + jitter;
+  currentRotation = totalRotation;
+  canvas.style.transform = 'rotate(' + totalRotation + 'deg)';
+
+  setTimeout(function(){
+    spinning = false;
+    spinBtn.disabled = false;
+    var food = foods[targetIndex];
+    var percent = (food.weight/total*100).toFixed(1);
+    resultFood.textContent = food.name;
+    resultProb.textContent = '权重命中概率 ' + percent + '%';
+    resultOverlay.classList.add('show');
+    if(navigator.vibrate) navigator.vibrate([50,30,50]);
+  }, 4100);
+}
+
+resultClose.addEventListener('click', function(){resultOverlay.classList.remove('show')});
+resultOverlay.addEventListener('click', function(e){
+  if(e.target === resultOverlay) resultOverlay.classList.remove('show');
+});
+
+// ============================================================
+// 食物列表渲染
+// ============================================================
+function renderList(){
+  var foods = getCurrentFoods();
+  foodList.innerHTML = '';
+  countEl.textContent = foods.length + ' 项';
+  editorMenuName.textContent = getCurrentMenu().name;
+
+  if(foods.length === 0){
+    var hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = '还没有食物，快添加吧～';
+    foodList.appendChild(hint);
+    return;
+  }
+
+  foods.forEach(function(food, index){
+    var item = document.createElement('div');
+    item.className = 'food-item';
+
+    var name = document.createElement('div');
+    name.className = 'food-name';
+    name.textContent = food.name;
+
+    var percent = document.createElement('div');
+    percent.className = 'food-percent';
+    percent.textContent = getPercent(index).toFixed(0) + '%';
+
+    var controls = document.createElement('div');
+    controls.className = 'weight-controls';
+
+    var minus = document.createElement('button');
+    minus.className='weight-btn';minus.textContent='−';
+    minus.addEventListener('click', function(){changeWeight(index,-1)});
+
+    var wv = document.createElement('span');
+    wv.className='weight-value';wv.textContent = food.weight;
+
+    var plus = document.createElement('button');
+    plus.className='weight-btn';plus.textContent='+';
+    plus.addEventListener('click', function(){changeWeight(index,1)});
+
+    controls.appendChild(minus);controls.appendChild(wv);controls.appendChild(plus);
+
+    var del = document.createElement('button');
+    del.className='del';del.textContent='×';
+    del.addEventListener('click', function(){removeFood(index)});
+
+    item.appendChild(name);item.appendChild(percent);item.appendChild(controls);item.appendChild(del);
+    foodList.appendChild(item);
+  });
+}
+
+// ============================================================
+// 食物增删改
+// ============================================================
+function addFood(){
+  var name = foodInput.value.trim();
+  if(!name) return;
+  var foods = getCurrentFoods();
+  if(foods.some(function(f){return f.name === name})){
+    foodInput.value='';foodInput.placeholder='已经有了哦～';
+    setTimeout(function(){foodInput.placeholder='输入食物名称...'},1200);
+    return;
+  }
+  if(foods.length >= MAX_FOODS){
+    foodInput.value='';foodInput.placeholder='最多 '+MAX_FOODS+' 项';
+    setTimeout(function(){foodInput.placeholder='输入食物名称...'},1200);
+    return;
+  }
+  foods.push({name:name, weight:1});
+  foodInput.value='';foodInput.focus();
+  saveState();renderList();drawWheel();
+}
+function removeFood(index){
+  getCurrentFoods().splice(index,1);
+  saveState();renderList();drawWheel();
+}
+function changeWeight(index, delta){
+  var food = getCurrentFoods()[index];
+  var nw = food.weight + delta;
+  if(nw < 1 || nw > MAX_WEIGHT) return;
+  food.weight = nw;
+  saveState();renderList();drawWheel();
+}
+
+addBtn.addEventListener('click', addFood);
+foodInput.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){e.preventDefault();addFood()}
+});
+spinBtn.addEventListener('click', spin);
+document.addEventListener('visibilitychange', function(){if(!document.hidden) drawWheel()});
+
+// ============================================================
+// 菜单下拉刷新
+// ============================================================
+function renderMenuSelect(){
+  menuSelect.innerHTML = '';
+  state.menus.forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name + '（' + m.foods.length + '）';
+    if(m.id === state.currentMenuId) opt.selected = true;
+    menuSelect.appendChild(opt);
+  });
+}
+
+menuSelect.addEventListener('change', function(){
+  switchMenu(menuSelect.value);
+});
+
+// ============================================================
+// 切换菜单
+// ============================================================
+function switchMenu(id){
+  if(!state.menus.some(function(m){return m.id===id})) return;
+  state.currentMenuId = id;
+  saveState();
+  renderMenuSelect();
+  renderList();
+  drawWheel();
+  // 转盘归零
+  currentRotation = 0;
+  canvas.style.transition = 'none';
+  canvas.style.transform = 'rotate(0deg)';
+  setTimeout(function(){canvas.style.transition = ''}, 50);
+}
+
+// ============================================================
+// 菜单管理面板
+// ============================================================
+function openMenuPanel(){
+  renderMenuCards();
+  menuPanel.classList.add('show');
+}
+function closeMenuPanel(){
+  menuPanel.classList.remove('show');
+}
+menuManageBtn.addEventListener('click', openMenuPanel);
+menuPanelClose.addEventListener('click', closeMenuPanel);
+
+function renderMenuCards(){
+  menuCards.innerHTML = '';
+  state.menus.forEach(function(m){
+    var card = document.createElement('div');
+    card.className = 'menu-card' + (m.id === state.currentMenuId ? ' active' : '');
+
+    var info = document.createElement('div');
+    info.className = 'info';
+    var nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.textContent = m.name + (m.id === state.currentMenuId ? ' ✓' : '');
+    var cnt = document.createElement('div');
+    cnt.className = 'cnt';
+    cnt.textContent = m.foods.length + ' 个食物';
+    info.appendChild(nm);
+    info.appendChild(cnt);
+    info.addEventListener('click', function(){
+      switchMenu(m.id);
+      closeMenuPanel();
+    });
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    // 重命名
+    var renameBtn = document.createElement('button');
+    renameBtn.className = 'icon-btn';
+    renameBtn.textContent = '✎';
+    renameBtn.setAttribute('aria-label', '重命名');
+    renameBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      openInputModal('重命名菜单', '输入新名称...', m.name, function(newName){
+        m.name = newName;
+        saveState();
+        renderMenuSelect();
+        renderList();
+        renderMenuCards();
+      });
+    });
+
+    // 删除
+    var delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn danger';
+    delBtn.textContent = '×';
+    delBtn.setAttribute('aria-label', '删除');
+    if(state.menus.length <= 1){
+      delBtn.disabled = true;
+    }
+    delBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(state.menus.length <= 1) return;
+      openConfirm(
+        '删除菜单？',
+        '「' + m.name + '」及其 ' + m.foods.length + ' 个食物将被删除，不可恢复。',
+        function(){
+          var idx = state.menus.findIndex(function(x){return x.id === m.id});
+          state.menus.splice(idx, 1);
+          if(state.currentMenuId === m.id){
+            state.currentMenuId = state.menus[0].id;
+          }
+          saveState();
+          renderMenuSelect();
+          renderList();
+          drawWheel();
+          renderMenuCards();
+          // 转盘归零
+          currentRotation = 0;
+          canvas.style.transition = 'none';
+          canvas.style.transform = 'rotate(0deg)';
+          setTimeout(function(){canvas.style.transition = ''}, 50);
+        }
+      );
+    });
+
+    actions.appendChild(renameBtn);
+    actions.appendChild(delBtn);
+
+    card.appendChild(info);
+    card.appendChild(actions);
+    menuCards.appendChild(card);
+  });
+}
+
+// 新建菜单
+newMenuBtn.addEventListener('click', function(){
+  if(state.menus.length >= MAX_MENUS){
+    alert('最多 ' + MAX_MENUS + ' 个菜单');
+    return;
+  }
+  openInputModal('新建菜单', '输入菜单名称...', '', function(name){
+    var newMenu = { id: uid(), name: name, foods: [] };
+    state.menus.push(newMenu);
+    state.currentMenuId = newMenu.id;
+    saveState();
+    renderMenuSelect();
+    renderList();
+    drawWheel();
+    renderMenuCards();
+    closeMenuPanel();
+    // 转盘归零
+    currentRotation = 0;
+    canvas.style.transition = 'none';
+    canvas.style.transform = 'rotate(0deg)';
+    setTimeout(function(){canvas.style.transition = ''}, 50);
+  });
+});
+
+// ============================================================
+// 通用输入弹窗
+// ============================================================
+var inputCallback = null;
+function openInputModal(title, placeholder, defaultValue, cb){
+  inputModalTitle.textContent = title;
+  inputModalField.placeholder = placeholder;
+  inputModalField.value = defaultValue || '';
+  inputCallback = cb;
+  inputModal.classList.add('show');
+  setTimeout(function(){inputModalField.focus();inputModalField.select()}, 120);
+}
+function closeInputModal(){
+  inputModal.classList.remove('show');
+  inputCallback = null;
+}
+inputModalCancel.addEventListener('click', closeInputModal);
+inputModalConfirm.addEventListener('click', function(){
+  var val = inputModalField.value.trim();
+  if(!val) return;
+  var cb = inputCallback;
+  closeInputModal();
+  if(cb) cb(val);
+});
+inputModalField.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){e.preventDefault();inputModalConfirm.click()}
+  else if(e.key === 'Escape'){closeInputModal()}
+});
+inputModal.addEventListener('click', function(e){
+  if(e.target === inputModal) closeInputModal();
+});
+
+// ============================================================
+// 通用确认弹窗
+// ============================================================
+var confirmCallback = null;
+function openConfirm(title, msg, cb){
+  confirmTitle.textContent = title;
+  confirmMsg.textContent = msg;
+  confirmCallback = cb;
+  confirmModal.classList.add('show');
+}
+function closeConfirm(){
+  confirmModal.classList.remove('show');
+  confirmCallback = null;
+}
+confirmCancel.addEventListener('click', closeConfirm);
+confirmOk.addEventListener('click', function(){
+  var cb = confirmCallback;
+  closeConfirm();
+  if(cb) cb();
+});
+confirmModal.addEventListener('click', function(e){
+  if(e.target === confirmModal) closeConfirm();
+});
+
+// ============================================================
+// 启动
+// ============================================================
+renderMenuSelect();
+renderList();
+drawWheel();
+
+})();
+</script>
+</body>
+</html>

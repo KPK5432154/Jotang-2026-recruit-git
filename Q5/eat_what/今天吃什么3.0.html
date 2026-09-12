@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>今天吃什么</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:#1a1a2e;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px;overflow-x:hidden}
+
+  h1{font-size:22px;margin:12px 0 16px;font-weight:600;letter-spacing:1px;background:linear-gradient(90deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+  .menu-bar{width:min(88vw,380px);display:flex;gap:8px;margin-bottom:14px}
+  .menu-select{flex:1;min-width:0;background:#252540;border:1px solid #3a3a55;border-radius:12px;padding:12px 40px 12px 14px;color:#fff;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23f7971e' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center}
+  .menu-select:focus{border-color:#f7971e}
+  .menu-btn{width:46px;height:46px;border-radius:12px;background:#252540;border:1px solid #3a3a55;color:#f7971e;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+  .menu-btn:active{transform:scale(.92);background:#3a3a55}
+
+  .wheel-container{position:relative;width:min(88vw,360px);height:min(88vw,360px);margin-bottom:20px}
+  canvas{width:100%;height:100%;display:block;border-radius:50%;box-shadow:0 0 30px rgba(247,151,30,.3);transition:transform 4s cubic-bezier(.17,.67,.12,1)}
+  .pointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:26px solid #ff4757;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));z-index:10}
+  .spin-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;background:linear-gradient(145deg,#ff6b6b,#ee5a24);border:4px solid #fff;color:#fff;font-size:16px;font-weight:700;cursor:pointer;z-index:10;box-shadow:0 4px 15px rgba(238,90,36,.6);transition:transform .15s;display:flex;align-items:center;justify-content:center}
+  .spin-btn:active{transform:translate(-50%,-50%) scale(.92)}
+  .spin-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .result-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px)}
+  .result-overlay.show{display:flex;animation:fadeIn .3s}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .result-card{background:linear-gradient(145deg,#2d2d44,#1f1f33);border-radius:20px;padding:36px 40px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);animation:popIn .4s cubic-bezier(.17,.67,.3,1.3);max-width:80vw}
+  @keyframes popIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .result-label{font-size:14px;color:#aaa;margin-bottom:12px}
+  .result-food{font-size:32px;font-weight:700;background:linear-gradient(90deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;word-break:break-all}
+  .result-prob{font-size:13px;color:#888;margin-bottom:20px}
+  .result-close{background:linear-gradient(145deg,#ff6b6b,#ee5a24);border:none;color:#fff;padding:12px 36px;border-radius:30px;font-size:16px;font-weight:600;cursor:pointer}
+  .result-close:active{transform:scale(.95)}
+
+  .editor{width:min(88vw,380px);background:#252540;border-radius:16px;padding:16px;margin-bottom:12px}
+  .editor-title{font-size:13px;color:#888;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .editor-title .hint{font-size:11px;color:#666}
+  .add-row{display:flex;gap:8px;margin-bottom:12px}
+  .add-row input{flex:1;min-width:0;background:#1a1a2e;border:1px solid #3a3a55;border-radius:10px;padding:10px 14px;color:#fff;font-size:15px;outline:none;transition:border-color .2s}
+  .add-row input:focus{border-color:#f7971e}
+  .add-row input::placeholder{color:#555}
+  .add-row button{background:linear-gradient(145deg,#f7971e,#ffd200);border:none;border-radius:10px;padding:0 18px;color:#1a1a2e;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .add-row button:active{transform:scale(.95)}
+  .food-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto}
+  .food-item{display:flex;align-items:center;gap:8px;background:#1a1a2e;border:1px solid #3a3a55;border-radius:12px;padding:8px 10px}
+  .food-name{flex:1;min-width:0;font-size:15px;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .food-percent{font-size:12px;color:#f7971e;font-weight:600;min-width:42px;text-align:right}
+  .weight-controls{display:flex;align-items:center;gap:4px}
+  .weight-btn{width:26px;height:26px;border-radius:8px;background:#2d2d44;border:1px solid #3a3a55;color:#f7971e;font-size:16px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .weight-btn:active{transform:scale(.9);background:#3a3a55}
+  .weight-value{min-width:26px;text-align:center;font-size:14px;color:#fff;font-weight:600}
+  .del{width:26px;height:26px;border-radius:8px;background:#ff4757;border:none;color:#fff;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+  .del:active{transform:scale(.9)}
+  .empty-hint{color:#555;font-size:13px;text-align:center;padding:12px 0;width:100%}
+  .food-list::-webkit-scrollbar{width:4px}
+  .food-list::-webkit-scrollbar-thumb{background:#3a3a55;border-radius:4px}
+
+  .data-section{width:min(88vw,380px);background:#252540;border-radius:16px;padding:16px;margin-bottom:12px}
+  .data-section .title{font-size:13px;color:#888;margin-bottom:12px}
+  .data-btns{display:flex;gap:10px}
+  .data-btns button{flex:1;padding:13px;border-radius:10px;border:none;font-size:15px;font-weight:600;cursor:pointer}
+  .data-btns .export{background:linear-gradient(145deg,#f7971e,#ffd200);color:#1a1a2e}
+  .data-btns .import{background:#1a1a2e;color:#f7971e;border:1px solid #3a3a55}
+  .data-btns button:active{transform:scale(.96)}
+
+  .panel{position:fixed;inset:0;background:#1a1a2e;z-index:200;display:none;flex-direction:column;padding:16px;overflow-y:auto}
+  .panel.show{display:flex;animation:slideUp .3s}
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-top:8px}
+  .panel-header h2{font-size:20px;font-weight:600}
+  .panel-header .close-btn{width:38px;height:38px;border-radius:10px;background:#252540;border:1px solid #3a3a55;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+  .panel-header .close-btn:active{transform:scale(.92)}
+
+  .menu-card{background:#252540;border:1px solid #3a3a55;border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;transition:border-color .2s}
+  .menu-card.active{border-color:#f7971e;background:#2a2a48}
+  .menu-card .info{flex:1;min-width:0;cursor:pointer}
+  .menu-card .info .nm{font-size:16px;font-weight:600;color:#fff;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .menu-card .info .cnt{font-size:12px;color:#888}
+  .menu-card.active .info .nm{color:#f7971e}
+  .menu-card .actions{display:flex;gap:6px;flex-shrink:0}
+  .icon-btn{width:36px;height:36px;border-radius:10px;background:#1a1a2e;border:1px solid #3a3a55;color:#f7971e;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+  .icon-btn:active{transform:scale(.9);background:#3a3a55}
+  .icon-btn.danger{color:#ff4757}
+  .icon-btn:disabled{opacity:.35;cursor:not-allowed}
+
+  .new-menu-btn{width:100%;padding:16px;border-radius:14px;background:linear-gradient(145deg,#f7971e,#ffd200);border:none;color:#1a1a2e;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px}
+  .new-menu-btn:active{transform:scale(.98)}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:300;backdrop-filter:blur(4px);padding:20px}
+  .modal-overlay.show{display:flex;animation:fadeIn .25s}
+  .modal{background:linear-gradient(145deg,#2d2d44,#1f1f33);border-radius:20px;padding:24px;width:min(88vw,360px);box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);animation:popIn .35s cubic-bezier(.17,.67,.3,1.3)}
+  .modal h3{font-size:17px;margin-bottom:16px;text-align:center;color:#fff}
+  .modal input{width:100%;background:#1a1a2e;border:1px solid #3a3a55;border-radius:10px;padding:12px 14px;color:#fff;font-size:16px;outline:none;margin-bottom:16px}
+  .modal input:focus{border-color:#f7971e}
+  .modal input::placeholder{color:#555}
+  .modal p{font-size:14px;color:#aaa;text-align:center;margin-bottom:16px;line-height:1.5}
+  .modal textarea{width:100%;height:180px;background:#1a1a2e;border:1px solid #3a3a55;border-radius:10px;padding:12px;color:#fff;font-size:13px;font-family:monospace;outline:none;resize:none;line-height:1.5}
+  .modal textarea:focus{border-color:#f7971e}
+  .modal-btns{display:flex;gap:10px;margin-top:16px}
+  .modal-btns button{flex:1;padding:13px;border-radius:10px;border:none;font-size:15px;font-weight:600;cursor:pointer}
+  .modal-btns .cancel{background:#1a1a2e;color:#aaa;border:1px solid #3a3a55}
+  .modal-btns .confirm{background:linear-gradient(145deg,#f7971e,#ffd200);color:#1a1a2e}
+  .modal-btns .confirm.danger{background:linear-gradient(145deg,#ff6b6b,#ee5a24);color:#fff}
+  .modal-btns button:active{transform:scale(.96)}
+  .modal .hint-text{font-size:12px;color:#666;text-align:center;margin-bottom:12px}
+  .choice-list{display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+  .choice-list button{width:100%;padding:14px;border-radius:12px;border:1px solid #3a3a55;background:#1a1a2e;color:#fff;font-size:15px;font-weight:600;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:4px}
+  .choice-list button:active{transform:scale(.98);background:#252540}
+  .choice-list button .sub{font-size:12px;color:#888;font-weight:400}
+  .choice-list button.primary{border-color:#f7971e}
+  .choice-list button.primary .sub{color:#f7971e}
+</style>
+</head>
+<body>
+
+  <h1>🍽️ 今天吃什么</h1>
+
+  <div class="menu-bar">
+    <select class="menu-select" id="menuSelect"></select>
+    <button class="menu-btn" id="menuManageBtn" aria-label="管理菜单">☰</button>
+  </div>
+
+  <div class="wheel-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="600" height="600"></canvas>
+    <button class="spin-btn" id="spinBtn">开始</button>
+  </div>
+
+  <div class="editor">
+    <div class="editor-title">
+      <span id="editorMenuName">我的菜单</span>
+      <span class="hint" id="count">0 项</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="foodInput" placeholder="输入食物名称..." maxlength="12">
+      <button id="addBtn">添加</button>
+    </div>
+    <div class="food-list" id="foodList"></div>
+  </div>
+
+  <div class="data-section">
+    <div class="title">📦 数据同步（跨设备复制菜单）</div>
+    <div class="data-btns">
+      <button class="export" id="exportBtn">导出菜单</button>
+      <button class="import" id="importBtn">导入菜单</button>
+    </div>
+  </div>
+
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-label">🎉 今天就吃</div>
+      <div class="result-food" id="resultFood"></div>
+      <div class="result-prob" id="resultProb"></div>
+      <button class="result-close" id="resultClose">好的！</button>
+    </div>
+  </div>
+
+  <div class="panel" id="menuPanel">
+    <div class="panel-header">
+      <h2>我的菜单</h2>
+      <button class="close-btn" id="menuPanelClose">×</button>
+    </div>
+    <div id="menuCards"></div>
+    <button class="new-menu-btn" id="newMenuBtn">+ 新建菜单</button>
+  </div>
+
+  <!-- 输入弹窗 -->
+  <div class="modal-overlay" id="inputModal">
+    <div class="modal">
+      <h3 id="inputModalTitle">新建菜单</h3>
+      <input type="text" id="inputModalField" placeholder="输入名称..." maxlength="16">
+      <div class="modal-btns">
+        <button class="cancel" id="inputModalCancel">取消</button>
+        <button class="confirm" id="inputModalConfirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认弹窗 -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle">确认删除？</h3>
+      <p id="confirmMsg"></p>
+      <div class="modal-btns">
+        <button class="cancel" id="confirmCancel">取消</button>
+        <button class="confirm danger" id="confirmOk">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导出弹窗 -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <h3>导出菜单</h3>
+      <p class="hint-text">复制下面这段文字发送到其他设备，或者下载为文件保存。</p>
+      <textarea id="exportText" readonly></textarea>
+      <div class="modal-btns">
+        <button class="cancel" id="exportClose">关闭</button>
+        <button class="cancel" id="exportDownload">下载文件</button>
+        <button class="confirm" id="exportCopy">复制文本</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入方式选择弹窗 -->
+  <div class="modal-overlay" id="importChoiceModal">
+    <div class="modal">
+      <h3>选择导入方式</h3>
+      <div class="choice-list">
+        <button class="primary" id="importFromText">
+          从文本粘贴
+          <span class="sub">手动粘贴之前导出的文本</span>
+        </button>
+        <button class="primary" id="importFromFile">
+          从文件选择
+          <span class="sub">选择之前下载的 .txt 文件</span>
+        </button>
+      </div>
+      <div class="modal-btns">
+        <button class="cancel" id="importChoiceCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入粘贴弹窗 -->
+  <div class="modal-overlay" id="importTextModal">
+    <div class="modal">
+      <h3>粘贴导入文本</h3>
+      <p class="hint-text">将之前导出的文本粘贴到下方。</p>
+      <textarea id="importTextArea" placeholder="在这里粘贴导出文本..."></textarea>
+      <div class="modal-btns">
+        <button class="cancel" id="importTextCancel">取消</button>
+        <button class="confirm" id="importTextConfirm">下一步</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入模式选择弹窗 -->
+  <div class="modal-overlay" id="importModeModal">
+    <div class="modal">
+      <h3>选择导入方式</h3>
+      <p class="hint-text" id="importModeInfo"></p>
+      <div class="choice-list">
+        <button class="primary" id="modeOverwrite">
+          覆盖现有菜单
+          <span class="sub">删除当前所有菜单，只保留导入的</span>
+        </button>
+        <button id="modeAppend">
+          追加为新菜单
+          <span class="sub">保留现有菜单，导入的作为新菜单加入</span>
+        </button>
+        <button id="modeMerge">
+          合并到当前菜单
+          <span class="sub">把导入的食物合并进当前菜单，重名跳过</span>
+        </button>
+      </div>
+      <div class="modal-btns">
+        <button class="cancel" id="importModeCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="fileInput" accept=".txt,.json,text/plain,application/json" style="display:none">
+
+<script>
+(function(){
+'use strict';
+
+// ============================================================
+// 数据模型
+// ============================================================
+var STORAGE_KEY = 'what_to_eat_menus_v4';
+var MAX_WEIGHT = 10;
+var MAX_FOODS  = 20;
+var MAX_MENUS  = 20;
+
+var DEFAULT_FOODS = [
+  {name:'火锅',weight:1},{name:'麻辣烫',weight:1},{name:'炸鸡',weight:1},{name:'汉堡',weight:1},
+  {name:'拉面',weight:1},{name:'炒饭',weight:1},{name:'饺子',weight:1},{name:'沙拉',weight:1}
+];
+
+var state = loadState();
+var spinning = false;
+var currentRotation = 0;
+
+// ---------------- DOM ----------------
+var canvas        = document.getElementById('wheel');
+var ctx           = canvas.getContext('2d');
+var spinBtn       = document.getElementById('spinBtn');
+var foodInput     = document.getElementById('foodInput');
+var addBtn        = document.getElementById('addBtn');
+var foodList      = document.getElementById('foodList');
+var countEl       = document.getElementById('count');
+var editorMenuName= document.getElementById('editorMenuName');
+var menuSelect    = document.getElementById('menuSelect');
+var menuManageBtn = document.getElementById('menuManageBtn');
+
+var resultOverlay = document.getElementById('resultOverlay');
+var resultFood    = document.getElementById('resultFood');
+var resultProb    = document.getElementById('resultProb');
+var resultClose   = document.getElementById('resultClose');
+
+var menuPanel     = document.getElementById('menuPanel');
+var menuPanelClose= document.getElementById('menuPanelClose');
+var menuCards     = document.getElementById('menuCards');
+var newMenuBtn    = document.getElementById('newMenuBtn');
+
+var inputModal       = document.getElementById('inputModal');
+var inputModalTitle  = document.getElementById('inputModalTitle');
+var inputModalField  = document.getElementById('inputModalField');
+var inputModalCancel = document.getElementById('inputModalCancel');
+var inputModalConfirm= document.getElementById('inputModalConfirm');
+
+var confirmModal  = document.getElementById('confirmModal');
+var confirmTitle  = document.getElementById('confirmTitle');
+var confirmMsg    = document.getElementById('confirmMsg');
+var confirmCancel = document.getElementById('confirmCancel');
+var confirmOk     = document.getElementById('confirmOk');
+
+var exportBtn   = document.getElementById('exportBtn');
+var importBtn   = document.getElementById('importBtn');
+var exportModal = document.getElementById('exportModal');
+var exportText  = document.getElementById('exportText');
+var exportClose = document.getElementById('exportClose');
+var exportCopy  = document.getElementById('exportCopy');
+var exportDownload = document.getElementById('exportDownload');
+
+var importChoiceModal  = document.getElementById('importChoiceModal');
+var importFromText     = document.getElementById('importFromText');
+var importFromFile     = document.getElementById('importFromFile');
+var importChoiceCancel = document.getElementById('importChoiceCancel');
+
+var importTextModal   = document.getElementById('importTextModal');
+var importTextArea    = document.getElementById('importTextArea');
+var importTextCancel  = document.getElementById('importTextCancel');
+var importTextConfirm = document.getElementById('importTextConfirm');
+
+var importModeModal  = document.getElementById('importModeModal');
+var importModeInfo   = document.getElementById('importModeInfo');
+var modeOverwrite    = document.getElementById('modeOverwrite');
+var modeAppend       = document.getElementById('modeAppend');
+var modeMerge        = document.getElementById('modeMerge');
+var importModeCancel = document.getElementById('importModeCancel');
+
+var fileInput = document.getElementById('fileInput');
+
+var SIZE=600, CENTER=300, RADIUS=290;
+var COLORS = ['#FF6B6B','#4ECDC4','#FFD93D','#6C5CE7','#00B894','#FD79A8','#E17055','#0984E3','#00CEC9','#FDCB6E','#E84393','#55EFC4','#74B9FF','#A29BFE','#FF7675','#81ECEC'];
+
+// ============================================================
+// 存储
+// ============================================================
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+function loadState(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      var s = JSON.parse(raw);
+      if(s && Array.isArray(s.menus) && s.menus.length > 0){
+        s.menus = s.menus.map(function(m){
+          return {
+            id:   m.id || uid(),
+            name: m.name || '未命名菜单',
+            foods: Array.isArray(m.foods) ? m.foods.map(function(f){
+              if(typeof f === 'string') return {name:f, weight:1};
+              return {name:f.name, weight:Number(f.weight)||1};
+            }) : []
+          };
+        });
+        if(!s.currentMenuId || !s.menus.some(function(m){return m.id===s.currentMenuId})){
+          s.currentMenuId = s.menus[0].id;
+        }
+        return s;
+      }
+    }
+  }catch(e){}
+
+  // 兼容旧数据
+  var migrated = null;
+  ['what_to_eat_foods_v2','what_to_eat_foods'].forEach(function(k){
+    if(migrated) return;
+    try{
+      var oldRaw = localStorage.getItem(k);
+      if(oldRaw){
+        var arr = JSON.parse(oldRaw);
+        if(Array.isArray(arr) && arr.length>0){
+          migrated = arr.map(function(f){
+            if(typeof f === 'string') return {name:f, weight:1};
+            return {name:f.name, weight:Number(f.weight)||1};
+          });
+        }
+      }
+    }catch(e){}
+  });
+
+  var first = {
+    id: uid(),
+    name: '默认菜单',
+    foods: migrated || DEFAULT_FOODS.map(function(f){return {name:f.name, weight:f.weight}})
+  };
+  return { currentMenuId: first.id, menus: [first] };
+}
+
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+// ============================================================
+// 当前菜单快捷方式
+// ============================================================
+function getCurrentMenu(){
+  return state.menus.find(function(m){return m.id === state.currentMenuId}) || state.menus[0];
+}
+function getCurrentFoods(){ return getCurrentMenu().foods; }
+function getTotalWeight(){
+  return getCurrentFoods().reduce(function(s,f){return s+f.weight},0);
+}
+function getPercent(i){
+  var t = getTotalWeight();
+  return t === 0 ? 0 : (getCurrentFoods()[i].weight / t) * 100;
+}
+
+// ============================================================
+// 加权随机
+// ============================================================
+function pickWeighted(){
+  var foods = getCurrentFoods();
+  var total = getTotalWeight();
+  var r = Math.random() * total;
+  for(var i=0;i<foods.length;i++){
+    r -= foods[i].weight;
+    if(r < 0) return i;
+  }
+  return foods.length - 1;
+}
+
+// ============================================================
+// 绘制转盘
+// ============================================================
+function drawWheel(){
+  ctx.clearRect(0,0,SIZE,SIZE);
+  var foods = getCurrentFoods();
+  var n = foods.length;
+
+  if(n === 0){
+    ctx.beginPath();ctx.arc(CENTER,CENTER,RADIUS,0,Math.PI*2);
+    ctx.fillStyle='#2d2d44';ctx.fill();
+    ctx.fillStyle='#666';ctx.font='bold 28px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('请添加食物',CENTER,CENTER);
+    return;
+  }
+
+  var total = getTotalWeight();
+  if(total === 0) return;
+
+  var startAngle = -Math.PI/2;
+  for(var i=0;i<n;i++){
+    var ratio = foods[i].weight / total;
+    var arc = ratio * Math.PI * 2;
+    var endAngle = startAngle + arc;
+
+    ctx.beginPath();
+    ctx.moveTo(CENTER,CENTER);
+    ctx.arc(CENTER,CENTER,RADIUS,startAngle,endAngle);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.2)';
+    ctx.lineWidth = 2;ctx.stroke();
+
+    if(arc > 0.25){
+      ctx.save();
+      ctx.translate(CENTER,CENTER);
+      ctx.rotate(startAngle + arc/2);
+      ctx.fillStyle = '#fff';
+      var fs = Math.max(14, Math.min(26, 200*ratio + 12));
+      ctx.font = 'bold ' + fs + 'px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,.5)';
+      ctx.shadowBlur = 3;
+      var text = foods[i].name;
+      if(text.length > 6) text = text.slice(0,6) + '…';
+      ctx.fillText(text, RADIUS - 22, 0);
+      ctx.restore();
+    }
+    startAngle = endAngle;
+  }
+
+  ctx.beginPath();
+  ctx.arc(CENTER,CENTER,RADIUS,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,.3)';
+  ctx.lineWidth=4;ctx.stroke();
+}
+
+// ============================================================
+// 旋转
+// ============================================================
+function spin(){
+  if(spinning || getCurrentFoods().length === 0) return;
+  spinning = true;
+  spinBtn.disabled = true;
+
+  var foods = getCurrentFoods();
+  var targetIndex = pickWeighted();
+  var total = getTotalWeight();
+
+  var accAngle = 0;
+  for(var i=0;i<targetIndex;i++) accAngle += (foods[i].weight/total) * Math.PI * 2;
+  var targetArc = (foods[targetIndex].weight/total) * Math.PI * 2;
+  var centerAngleDeg = (accAngle + targetArc/2) * 180 / Math.PI;
+
+  var baseAngle = 360 - centerAngleDeg;
+  var extraTurns = 5 + Math.floor(Math.random()*3);
+  var jitter = (Math.random()-.5) * (targetArc*180/Math.PI) * .8;
+
+  var currentMod = ((currentRotation % 360) + 360) % 360;
+  var targetMod  = ((baseAngle % 360) + 360) % 360;
+  var delta = targetMod - currentMod;
+  if(delta < 0) delta += 360;
+
+  var totalRotation = currentRotation + extraTurns*360 + delta + jitter;
+  currentRotation = totalRotation;
+  canvas.style.transform = 'rotate(' + totalRotation + 'deg)';
+
+  setTimeout(function(){
+    spinning = false;
+    spinBtn.disabled = false;
+    var food = foods[targetIndex];
+    var percent = (food.weight/total*100).toFixed(1);
+    resultFood.textContent = food.name;
+    resultProb.textContent = '权重命中概率 ' + percent + '%';
+    resultOverlay.classList.add('show');
+    if(navigator.vibrate) navigator.vibrate([50,30,50]);
+  }, 4100);
+}
+
+resultClose.addEventListener('click', function(){resultOverlay.classList.remove('show')});
+resultOverlay.addEventListener('click', function(e){
+  if(e.target === resultOverlay) resultOverlay.classList.remove('show');
+});
+
+// ============================================================
+// 食物列表渲染
+// ============================================================
+function renderList(){
+  var foods = getCurrentFoods();
+  foodList.innerHTML = '';
+  countEl.textContent = foods.length + ' 项';
+  editorMenuName.textContent = getCurrentMenu().name;
+
+  if(foods.length === 0){
+    var hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = '还没有食物，快添加吧～';
+    foodList.appendChild(hint);
+    return;
+  }
+
+  foods.forEach(function(food, index){
+    var item = document.createElement('div');
+    item.className = 'food-item';
+
+    var name = document.createElement('div');
+    name.className = 'food-name';
+    name.textContent = food.name;
+
+    var percent = document.createElement('div');
+    percent.className = 'food-percent';
+    percent.textContent = getPercent(index).toFixed(0) + '%';
+
+    var controls = document.createElement('div');
+    controls.className = 'weight-controls';
+
+    var minus = document.createElement('button');
+    minus.className='weight-btn';minus.textContent='−';
+    minus.addEventListener('click', function(){changeWeight(index,-1)});
+
+    var wv = document.createElement('span');
+    wv.className='weight-value';wv.textContent = food.weight;
+
+    var plus = document.createElement('button');
+    plus.className='weight-btn';plus.textContent='+';
+    plus.addEventListener('click', function(){changeWeight(index,1)});
+
+    controls.appendChild(minus);controls.appendChild(wv);controls.appendChild(plus);
+
+    var del = document.createElement('button');
+    del.className='del';del.textContent='×';
+    del.addEventListener('click', function(){removeFood(index)});
+
+    item.appendChild(name);item.appendChild(percent);item.appendChild(controls);item.appendChild(del);
+    foodList.appendChild(item);
+  });
+}
+
+// ============================================================
+// 食物增删改
+// ============================================================
+function addFood(){
+  var name = foodInput.value.trim();
+  if(!name) return;
+  var foods = getCurrentFoods();
+  if(foods.some(function(f){return f.name === name})){
+    foodInput.value='';foodInput.placeholder='已经有了哦～';
+    setTimeout(function(){foodInput.placeholder='输入食物名称...'},1200);
+    return;
+  }
+  if(foods.length >= MAX_FOODS){
+    foodInput.value='';foodInput.placeholder='最多 '+MAX_FOODS+' 项';
+    setTimeout(function(){foodInput.placeholder='输入食物名称...'},1200);
+    return;
+  }
+  foods.push({name:name, weight:1});
+  foodInput.value='';foodInput.focus();
+  saveState();renderList();drawWheel();
+}
+function removeFood(index){
+  getCurrentFoods().splice(index,1);
+  saveState();renderList();drawWheel();
+}
+function changeWeight(index, delta){
+  var food = getCurrentFoods()[index];
+  var nw = food.weight + delta;
+  if(nw < 1 || nw > MAX_WEIGHT) return;
+  food.weight = nw;
+  saveState();renderList();drawWheel();
+}
+
+addBtn.addEventListener('click', addFood);
+foodInput.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){e.preventDefault();addFood()}
+});
+spinBtn.addEventListener('click', spin);
+document.addEventListener('visibilitychange', function(){if(!document.hidden) drawWheel()});
+
+// ============================================================
+// 菜单下拉
+// ============================================================
+function renderMenuSelect(){
+  menuSelect.innerHTML = '';
+  state.menus.forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name + '（' + m.foods.length + '）';
+    if(m.id === state.currentMenuId) opt.selected = true;
+    menuSelect.appendChild(opt);
+  });
+}
+
+menuSelect.addEventListener('change', function(){
+  switchMenu(menuSelect.value);
+});
+
+function switchMenu(id){
+  if(!state.menus.some(function(m){return m.id===id})) return;
+  state.currentMenuId = id;
+  saveState();
+  renderMenuSelect();
+  renderList();
+  drawWheel();
+  currentRotation = 0;
+  canvas.style.transition = 'none';
+  canvas.style.transform = 'rotate(0deg)';
+  setTimeout(function(){canvas.style.transition = ''}, 50);
+}
+
+// ============================================================
+// 菜单管理面板
+// ============================================================
+function openMenuPanel(){
+  renderMenuCards();
+  menuPanel.classList.add('show');
+}
+function closeMenuPanel(){
+  menuPanel.classList.remove('show');
+}
+menuManageBtn.addEventListener('click', openMenuPanel);
+menuPanelClose.addEventListener('click', closeMenuPanel);
+
+function renderMenuCards(){
+  menuCards.innerHTML = '';
+  state.menus.forEach(function(m){
+    var card = document.createElement('div');
+    card.className = 'menu-card' + (m.id === state.currentMenuId ? ' active' : '');
+
+    var info = document.createElement('div');
+    info.className = 'info';
+    var nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.textContent = m.name + (m.id === state.currentMenuId ? ' ✓' : '');
+    var cnt = document.createElement('div');
+    cnt.className = 'cnt';
+    cnt.textContent = m.foods.length + ' 个食物';
+    info.appendChild(nm);
+    info.appendChild(cnt);
+    info.addEventListener('click', function(){
+      switchMenu(m.id);
+      closeMenuPanel();
+    });
+
+    var actions = document.createElement('div');
+    actions.className = 'actions';
+
+    var renameBtn = document.createElement('button');
+    renameBtn.className = 'icon-btn';
+    renameBtn.textContent = '✎';
+    renameBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      openInputModal('重命名菜单', '输入新名称...', m.name, function(newName){
+        m.name = newName;
+        saveState();
+        renderMenuSelect();
+        renderList();
+        renderMenuCards();
+      });
+    });
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn danger';
+    delBtn.textContent = '×';
+    if(state.menus.length <= 1) delBtn.disabled = true;
+    delBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(state.menus.length <= 1) return;
+      openConfirm(
+        '删除菜单？',
+        '「' + m.name + '」及其 ' + m.foods.length + ' 个食物将被删除，不可恢复。',
+        function(){
+          var idx = state.menus.findIndex(function(x){return x.id === m.id});
+          state.menus.splice(idx, 1);
+          if(state.currentMenuId === m.id){
+            state.currentMenuId = state.menus[0].id;
+          }
+          saveState();
+          renderMenuSelect();
+          renderList();
+          drawWheel();
+          renderMenuCards();
+          currentRotation = 0;
+          canvas.style.transition = 'none';
+          canvas.style.transform = 'rotate(0deg)';
+          setTimeout(function(){canvas.style.transition = ''}, 50);
+        }
+      );
+    });
+
+    actions.appendChild(renameBtn);
+    actions.appendChild(delBtn);
+
+    card.appendChild(info);
+    card.appendChild(actions);
+    menuCards.appendChild(card);
+  });
+}
+
+newMenuBtn.addEventListener('click', function(){
+  if(state.menus.length >= MAX_MENUS){
+    alert('最多 ' + MAX_MENUS + ' 个菜单');
+    return;
+  }
+  openInputModal('新建菜单', '输入菜单名称...', '', function(name){
+    var newMenu = { id: uid(), name: name, foods: [] };
+    state.menus.push(newMenu);
+    state.currentMenuId = newMenu.id;
+    saveState();
+    renderMenuSelect();
+    renderList();
+    drawWheel();
+    renderMenuCards();
+    closeMenuPanel();
+    currentRotation = 0;
+    canvas.style.transition = 'none';
+    canvas.style.transform = 'rotate(0deg)';
+    setTimeout(function(){canvas.style.transition = ''}, 50);
+  });
+});
+
+// ============================================================
+// 输入弹窗
+// ============================================================
+var inputCallback = null;
+function openInputModal(title, placeholder, defaultValue, cb){
+  inputModalTitle.textContent = title;
+  inputModalField.placeholder = placeholder;
+  inputModalField.value = defaultValue || '';
+  inputCallback = cb;
+  inputModal.classList.add('show');
+  setTimeout(function(){inputModalField.focus();inputModalField.select()}, 120);
+}
+function closeInputModal(){
+  inputModal.classList.remove('show');
+  inputCallback = null;
+}
+inputModalCancel.addEventListener('click', closeInputModal);
+inputModalConfirm.addEventListener('click', function(){
+  var val = inputModalField.value.trim();
+  if(!val) return;
+  var cb = inputCallback;
+  closeInputModal();
+  if(cb) cb(val);
+});
+inputModalField.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){e.preventDefault();inputModalConfirm.click()}
+  else if(e.key === 'Escape'){closeInputModal()}
+});
+inputModal.addEventListener('click', function(e){
+  if(e.target === inputModal) closeInputModal();
+});
+
+// ============================================================
+// 确认弹窗
+// ============================================================
+var confirmCallback = null;
+function openConfirm(title, msg, cb){
+  confirmTitle.textContent = title;
+  confirmMsg.textContent = msg;
+  confirmCallback = cb;
+  confirmModal.classList.add('show');
+}
+function closeConfirm(){
+  confirmModal.classList.remove('show');
+  confirmCallback = null;
+}
+confirmCancel.addEventListener('click', closeConfirm);
+confirmOk.addEventListener('click', function(){
+  var cb = confirmCallback;
+  closeConfirm();
+  if(cb) cb();
+});
+confirmModal.addEventListener('click', function(e){
+  if(e.target === confirmModal) closeConfirm();
+});
+
+// ============================================================
+// 导出
+// ============================================================
+var EXPORT_PREFIX = 'EAT_MENU_V1:';
+
+exportBtn.addEventListener('click', function(){
+  var payload = {
+    v: 1,
+    t: Date.now(),
+    menus: state.menus.map(function(m){
+      return {
+        n: m.name,
+        f: m.foods.map(function(f){ return [f.name, f.weight]; })
+      };
+    })
+  };
+  var text = EXPORT_PREFIX + JSON.stringify(payload);
+  exportText.value = text;
+  exportModal.classList.add('show');
+  setTimeout(function(){ exportText.select(); }, 100);
+});
+
+exportClose.addEventListener('click', function(){
+  exportModal.classList.remove('show');
+});
+exportModal.addEventListener('click', function(e){
+  if(e.target === exportModal) exportModal.classList.remove('show');
+});
+
+exportCopy.addEventListener('click', function(){
+  var text = exportText.value;
+  var done = function(){
+    exportCopy.textContent = '已复制 ✓';
+    setTimeout(function(){ exportCopy.textContent = '复制文本'; }, 1500);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(function(){
+      exportText.select();
+      try{ document.execCommand('copy'); done(); }catch(e){}
+    });
+  }else{
+    exportText.select();
+    try{ document.execCommand('copy'); done(); }catch(e){}
+  }
+});
+
+exportDownload.addEventListener('click', function(){
+  var text = exportText.value;
+  var blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var d = new Date();
+  var stamp = d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '_' + ('0'+d.getHours()).slice(-2) + ('0'+d.getMinutes()).slice(-2);
+  a.href = url;
+  a.download = '今天吃什么菜单_' + stamp + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  exportDownload.textContent = '已下载 ✓';
+  setTimeout(function(){ exportDownload.textContent = '下载文件'; }, 1500);
+});
+
+// ============================================================
+// 导入
+// ============================================================
+var pendingImportText = null; // 待导入的原始文本
+
+importBtn.addEventListener('click', function(){
+  importChoiceModal.classList.add('show');
+});
+
+importChoiceCancel.addEventListener('click', function(){
+  importChoiceModal.classList.remove('show');
+});
+
+// --- 从文本导入 ---
+importFromText.addEventListener('click', function(){
+  importChoiceModal.classList.remove('show');
+  importTextArea.value = '';
+  importTextModal.classList.add('show');
+  setTimeout(function(){ importTextArea.focus(); }, 150);
+});
+
+importTextCancel.addEventListener('click', function(){
+  importTextModal.classList.remove('show');
+});
+importTextModal.addEventListener('click', function(e){
+  if(e.target === importTextModal) importTextModal.classList.remove('show');
+});
+
+importTextConfirm.addEventListener('click', function(){
+  var raw = importTextArea.value.trim();
+  if(!raw){
+    alert('请先粘贴导出文本');
+    return;
+  }
+  importTextModal.classList.remove('show');
+  pendingImportText = raw;
+  showImportModeChoice();
+});
+
+// --- 从文件导入 ---
+importFromFile.addEventListener('click', function(){
+  importChoiceModal.classList.remove('show');
+  fileInput.value = '';
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', function(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var txt = ev.target.result || '';
+    txt = String(txt).trim();
+    if(!txt){
+      alert('文件为空');
+      return;
+    }
+    pendingImportText = txt;
+    showImportModeChoice();
+  };
+  reader.onerror = function(){
+    alert('文件读取失败');
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+// --- 解析导入文本 ---
+function parseImportText(raw){
+  if(!raw) return {ok:false, msg:'内容为空'};
+  // 去掉所有空白字符（保留 JSON 内部的字符串空格）
+  // 更安全的做法：先尝试带前缀直接解析，失败再清理
+  var text = raw.trim();
+
+  // 去掉前缀
+  if(text.indexOf(EXPORT_PREFIX) !== 0){
+    // 也可能是纯 JSON，尝试直接解析
+    try{
+      var p = JSON.parse(text);
+      if(p && Array.isArray(p.menus)) return {ok:true, payload:p};
+    }catch(e){}
+    return {ok:false, msg:'格式不正确，请确认粘贴的是完整导出文本'};
+  }
+
+  var jsonStr = text.slice(EXPORT_PREFIX.length).trim();
+
+  var payload;
+  try{
+    payload = JSON.parse(jsonStr);
+  }catch(e){
+    return {ok:false, msg:'文本解析失败，可能被截断或不完整'};
+  }
+
+  if(!payload || !Array.isArray(payload.menus) || payload.menus.length === 0){
+    return {ok:false, msg:'数据为空或格式错误'};
+  }
+  return {ok:true, payload:payload};
+}
+
+// --- 规范化菜单数据 ---
+function normalizeMenus(payload){
+  var out = [];
+  payload.menus.forEach(function(m){
+    if(!m || typeof m.n !== 'string' || !Array.isArray(m.f)) return;
+    var foods = [];
+    m.f.forEach(function(pair){
+      if(!Array.isArray(pair) || pair.length < 2) return;
+      var name = String(pair[0]).trim();
+      var w = Number(pair[1]);
+      if(!name) return;
+      if(isNaN(w) || w < 1) w = 1;
+      if(w > MAX_WEIGHT) w = MAX_WEIGHT;
+      // 同名去重
+      if(foods.some(function(x){return x.name === name})) return;
+      foods.push({name:name, weight:w});
+    });
+    out.push({
+      id: uid(),
+      name: (m.n || '未命名菜单').trim() || '未命名菜单',
+      foods: foods.slice(0, MAX_FOODS)
+    });
+  });
+  return out;
+}
+
+// --- 显示导入模式选择 ---
+function showImportModeChoice(){
+  var parsed = parseImportText(pendingImportText);
+  if(!parsed.ok){
+    alert(parsed.msg);
+    pendingImportText = null;
+    return;
+  }
+  var menus = normalizeMenus(parsed.payload);
+  if(menus.length === 0){
+    alert('没有可用的菜单数据');
+    pendingImportText = null;
+    return;
+  }
+  pendingImportText = parsed.payload; // 保存已解析的
+  var totalFoods = menus.reduce(function(s,m){return s+m.foods.length},0);
+  importModeInfo.textContent = '将导入 ' + menus.length + ' 个菜单，共 ' + totalFoods + ' 个食物。请选择导入方式：';
+  importModeModal.classList.add('show');
+}
+
+// --- 执行导入 ---
+function doImport(mode){
+  var parsed = parseImportText(pendingImportText);
+  if(!parsed.ok){
+    alert(parsed.msg);
+    pendingImportText = null;
+    return;
+  }
+  var menus = normalizeMenus(parsed.payload);
+  if(menus.length === 0){
+    alert('没有可用的菜单数据');
+    pendingImportText = null;
+    return;
+  }
+
+  if(mode === 'overwrite'){
+    // 覆盖：清空现有菜单
+    state.menus = menus;
+    state.currentMenuId = menus[0].id;
+  }else if(mode === 'append'){
+    // 追加：把导入的菜单逐个加进来，重名加序号
+    menus.forEach(function(m){
+      var finalName = m.name;
+      var idx = 1;
+      while(state.menus.some(function(x){return x.name === finalName})){
+        idx++;
+        finalName = m.name + ' (' + idx + ')';
+      }
+      m.name = finalName;
+      state.menus.push(m);
+      if(state.menus.length >= MAX_MENUS) return;
+    });
+    // 如果超过上限，截断
+    if(state.menus.length > MAX_MENUS){
+      state.menus = state.menus.slice(0, MAX_MENUS);
+    }
+  }else if(mode === 'merge'){
+    // 合并到当前菜单：把导入菜单里的所有食物合并进当前菜单
+    var current = getCurrentMenu();
+    menus.forEach(function(m){
+      m.foods.forEach(function(f){
+        if(current.foods.length >= MAX_FOODS) return;
+        if(current.foods.some(function(x){return x.name === f.name})) return;
+        current.foods.push({name:f.name, weight:f.weight});
+      });
+    });
+  }
+
+  saveState();
+  renderMenuSelect();
+  renderList();
+  drawWheel();
+
+  currentRotation = 0;
+  canvas.style.transition = 'none';
+  canvas.style.transform = 'rotate(0deg)';
+  setTimeout(function(){canvas.style.transition = ''}, 50);
+
+  importModeModal.classList.remove('show');
+  pendingImportText = null;
+
+  var msg = '导入成功！';
+  if(mode === 'overwrite') msg = '已覆盖为 ' + state.menus.length + ' 个菜单';
+  else if(mode === 'append') msg = '已追加为 ' + state.menus.length + ' 个菜单';
+  else if(mode === 'merge') msg = '已合并到「' + getCurrentMenu().name + '」';
+  setTimeout(function(){ alert(msg); }, 100);
+}
+
+modeOverwrite.addEventListener('click', function(){ doImport('overwrite') });
+modeAppend.addEventListener('click', function(){ doImport('append') });
+modeMerge.addEventListener('click', function(){ doImport('merge') });
+
+importModeCancel.addEventListener('click', function(){
+  importModeModal.classList.remove('show');
+  pendingImportText = null;
+});
+importModeModal.addEventListener('click', function(e){
+  if(e.target === importModeModal){
+    importModeModal.classList.remove('show');
+    pendingImportText = null;
+  }
+});
+
+// ============================================================
+// 启动
+// ============================================================
+renderMenuSelect();
+renderList();
+drawWheel();
+
+})();
+</script>
+</body>
+</html>

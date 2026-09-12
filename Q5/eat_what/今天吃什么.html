@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>今天吃什么</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    overflow-x: hidden;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 12px 0 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .wheel-container {
+    position: relative;
+    width: min(88vw, 360px);
+    height: min(88vw, 360px);
+    margin-bottom: 20px;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 50%;
+    box-shadow: 0 0 30px rgba(247, 151, 30, 0.3);
+    transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 1);
+  }
+  .pointer {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 26px solid #ff4757;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    z-index: 10;
+  }
+  .spin-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #ff6b6b, #ee5a24);
+    border: 4px solid #fff;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 4px 15px rgba(238, 90, 36, 0.6);
+    transition: transform 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .spin-btn:active {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  .spin-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .result-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .result-overlay.show {
+    display: flex;
+    animation: fadeIn 0.3s;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .result-card {
+    background: linear-gradient(145deg, #2d2d44, #1f1f33);
+    border-radius: 20px;
+    padding: 36px 40px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: popIn 0.4s cubic-bezier(0.17, 0.67, 0.3, 1.3);
+    max-width: 80vw;
+  }
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .result-label {
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 12px;
+  }
+  .result-food {
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+    word-break: break-all;
+  }
+  .result-prob {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+  .result-close {
+    background: linear-gradient(145deg, #ff6b6b, #ee5a24);
+    border: none;
+    color: #fff;
+    padding: 12px 36px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .result-close:active {
+    transform: scale(0.95);
+  }
+
+  .editor {
+    width: min(88vw, 360px);
+    background: #252540;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .editor-title {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .editor-title .hint {
+    font-size: 11px;
+    color: #666;
+  }
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .add-row input {
+    flex: 1;
+    min-width: 0;
+    background: #1a1a2e;
+    border: 1px solid #3a3a55;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-row input:focus {
+    border-color: #f7971e;
+  }
+  .add-row input::placeholder {
+    color: #555;
+  }
+  .add-row button {
+    background: linear-gradient(145deg, #f7971e, #ffd200);
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    color: #1a1a2e;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .add-row button:active {
+    transform: scale(0.95);
+  }
+
+  .food-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .food-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a1a2e;
+    border: 1px solid #3a3a55;
+    border-radius: 12px;
+    padding: 8px 10px;
+    animation: tagIn 0.25s;
+  }
+  @keyframes tagIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .food-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    color: #ddd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .food-percent {
+    font-size: 12px;
+    color: #f7971e;
+    font-weight: 600;
+    min-width: 42px;
+    text-align: right;
+  }
+  .weight-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .weight-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: #2d2d44;
+    border: 1px solid #3a3a55;
+    color: #f7971e;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .weight-btn:active {
+    transform: scale(0.9);
+    background: #3a3a55;
+  }
+  .weight-value {
+    min-width: 26px;
+    text-align: center;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 600;
+  }
+  .del {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: #ff4757;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .del:active {
+    transform: scale(0.9);
+  }
+  .empty-hint {
+    color: #555;
+    font-size: 13px;
+    text-align: center;
+    padding: 12px 0;
+    width: 100%;
+  }
+  .food-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  .food-list::-webkit-scrollbar-thumb {
+    background: #3a3a55;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+  <h1>🍽️ 今天吃什么</h1>
+
+  <div class="wheel-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="600" height="600"></canvas>
+    <button class="spin-btn" id="spinBtn">开始</button>
+  </div>
+
+  <div class="editor">
+    <div class="editor-title">
+      <span>我的菜单</span>
+      <span class="hint" id="count">0 项</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="foodInput" placeholder="输入食物名称..." maxlength="12">
+      <button id="addBtn">添加</button>
+    </div>
+    <div class="food-list" id="foodList"></div>
+  </div>
+
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-label">🎉 今天就吃</div>
+      <div class="result-food" id="resultFood"></div>
+      <div class="result-prob" id="resultProb"></div>
+      <button class="result-close" id="resultClose">好的！</button>
+    </div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ 数据 ============
+  const STORAGE_KEY = 'what_to_eat_foods_v2';
+  const DEFAULT_FOODS = [
+    { name: '火锅', weight: 1 },
+    { name: '麻辣烫', weight: 1 },
+    { name: '炸鸡', weight: 1 },
+    { name: '汉堡', weight: 1 },
+    { name: '拉面', weight: 1 },
+    { name: '炒饭', weight: 1 },
+    { name: '饺子', weight: 1 },
+    { name: '沙拉', weight: 1 }
+  ];
+  const MAX_WEIGHT = 10;
+
+  let foods = loadFoods();
+  let spinning = false;
+
+  // ============ DOM ============
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  const spinBtn = document.getElementById('spinBtn');
+  const foodInput = document.getElementById('foodInput');
+  const addBtn = document.getElementById('addBtn');
+  const foodList = document.getElementById('foodList');
+  const countEl = document.getElementById('count');
+  const resultOverlay = document.getElementById('resultOverlay');
+  const resultFood = document.getElementById('resultFood');
+  const resultProb = document.getElementById('resultProb');
+  const resultClose = document.getElementById('resultClose');
+
+  const SIZE = 600;
+  const CENTER = SIZE / 2;
+  const RADIUS = CENTER - 10;
+
+  const COLORS = [
+    '#FF6B6B', '#4ECDC4', '#FFD93D', '#6C5CE7',
+    '#00B894', '#FD79A8', '#E17055', '#0984E3',
+    '#00CEC9', '#FDCB6E', '#E84393', '#55EFC4',
+    '#74B9FF', '#A29BFE', '#FF7675', '#81ECEC'
+  ];
+
+  // ============ 存储 ============
+  function loadFoods() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length > 0) {
+          // 兼容旧格式
+          return arr.map(item => {
+            if (typeof item === 'string') return { name: item, weight: 1 };
+            return { name: item.name, weight: item.weight || 1 };
+          });
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_FOODS.map(f => ({ ...f }));
+  }
+
+  function saveFoods() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(foods));
+    } catch (e) {}
+  }
+
+  // ============ 概率计算 ============
+  function getTotalWeight() {
+    return foods.reduce((sum, f) => sum + f.weight, 0);
+  }
+
+  function getPercent(index) {
+    const total = getTotalWeight();
+    if (total === 0) return 0;
+    return (foods[index].weight / total) * 100;
+  }
+
+  // ============ 加权随机抽取 ============
+  function pickWeighted() {
+    const total = getTotalWeight();
+    let r = Math.random() * total;
+    for (let i = 0; i < foods.length; i++) {
+      r -= foods[i].weight;
+      if (r < 0) return i;
+    }
+    return foods.length - 1;
+  }
+
+  // ============ 绘制轮盘（扇区大小按权重）============
+  function drawWheel() {
+    ctx.clearRect(0, 0, SIZE, SIZE);
+
+    const n = foods.length;
+
+    if (n === 0) {
+      ctx.beginPath();
+      ctx.arc(CENTER, CENTER, RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = '#2d2d44';
+      ctx.fill();
+      ctx.fillStyle = '#666';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('请添加食物', CENTER, CENTER);
+      return;
+    }
+
+    const total = getTotalWeight();
+    if (total === 0) return;
+
+    let startAngle = -Math.PI / 2; // 从顶部开始
+
+    for (let i = 0; i < n; i++) {
+      const ratio = foods[i].weight / total;
+      const arc = ratio * Math.PI * 2;
+      const endAngle = startAngle + arc;
+
+      // 扇形
+      ctx.beginPath();
+      ctx.moveTo(CENTER, CENTER);
+      ctx.arc(CENTER, CENTER, RADIUS, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[i % COLORS.length];
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 文字（扇区太小时不画）
+      if (arc > 0.25) {
+        ctx.save();
+        ctx.translate(CENTER, CENTER);
+        ctx.rotate(startAngle + arc / 2);
+
+        ctx.fillStyle = '#fff';
+        const fontSize = Math.max(14, Math.min(26, 200 * ratio + 12));
+        ctx.font = 'bold ' + fontSize + 'px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 3;
+
+        let text = foods[i].name;
+        if (text.length > 6) text = text.slice(0, 6) + '…';
+        ctx.fillText(text, RADIUS - 22, 0);
+
+        ctx.restore();
+      }
+
+      startAngle = endAngle;
+    }
+
+    // 外圈
+    ctx.beginPath();
+    ctx.arc(CENTER, CENTER, RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+  }
+
+  // ============ 旋转 ============
+  let currentRotation = 0;
+
+  function spin() {
+    if (spinning || foods.length === 0) return;
+
+    spinning = true;
+    spinBtn.disabled = true;
+
+    // 加权抽取目标
+    const targetIndex = pickWeighted();
+
+    // 计算该扇区的中心角度（从顶部 -90° 起算，顺时针）
+    const total = getTotalWeight();
+    let accAngle = 0; // 累积弧度
+    for (let i = 0; i < targetIndex; i++) {
+      accAngle += (foods[i].weight / total) * Math.PI * 2;
+    }
+    const targetArc = (foods[targetIndex].weight / total) * Math.PI * 2;
+    const centerAngleRad = accAngle + targetArc / 2;
+    const centerAngleDeg = centerAngleRad * 180 / Math.PI;
+
+    // 指针在顶部，需要把该扇区中心转到 0°（顶部）
+    // canvas 顺时针为正，所以旋转角度 = 360 - centerAngleDeg
+    const baseAngle = 360 - centerAngleDeg;
+    const extraTurns = 5 + Math.floor(Math.random() * 3);
+    // 扇区内随机偏移，不超过扇区的 80%
+    const jitter = (Math.random() - 0.5) * (targetArc * 180 / Math.PI) * 0.8;
+
+    const currentMod = ((currentRotation % 360) + 360) % 360;
+    const targetMod = ((baseAngle % 360) + 360) % 360;
+    let delta = targetMod - currentMod;
+    if (delta < 0) delta += 360;
+
+    const totalRotation = currentRotation + extraTurns * 360 + delta + jitter;
+    currentRotation = totalRotation;
+
+    canvas.style.transform = `rotate(${totalRotation}deg)`;
+
+    setTimeout(() => {
+      spinning = false;
+      spinBtn.disabled = false;
+      const food = foods[targetIndex];
+      const percent = (food.weight / total * 100).toFixed(1);
+      showResult(food.name, percent);
+    }, 4100);
+  }
+
+  // ============ 结果弹窗 ============
+  function showResult(food, percent) {
+    resultFood.textContent = food;
+    resultProb.textContent = `权重命中概率 ${percent}%`;
+    resultOverlay.classList.add('show');
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
+  }
+
+  function hideResult() {
+    resultOverlay.classList.remove('show');
+  }
+
+  // ============ 列表渲染 ============
+  function renderList() {
+    foodList.innerHTML = '';
+    countEl.textContent = foods.length + ' 项';
+
+    if (foods.length === 0) {
+      const hint = document.createElement('div');
+      hint.className = 'empty-hint';
+      hint.textContent = '还没有食物，快添加吧～';
+      foodList.appendChild(hint);
+      return;
+    }
+
+    foods.forEach((food, index) => {
+      const item = document.createElement('div');
+      item.className = 'food-item';
+
+      // 名称
+      const name = document.createElement('div');
+      name.className = 'food-name';
+      name.textContent = food.name;
+
+      // 概率显示
+      const percent = document.createElement('div');
+      percent.className = 'food-percent';
+      percent.textContent = getPercent(index).toFixed(0) + '%';
+
+      // 权重控制
+      const controls = document.createElement('div');
+      controls.className = 'weight-controls';
+
+      const minus = document.createElement('button');
+      minus.className = 'weight-btn';
+      minus.textContent = '−';
+      minus.setAttribute('aria-label', '减少权重');
+      minus.addEventListener('click', () => changeWeight(index, -1));
+
+      const weightVal = document.createElement('span');
+      weightVal.className = 'weight-value';
+      weightVal.textContent = food.weight;
+
+      const plus = document.createElement('button');
+      plus.className = 'weight-btn';
+      plus.textContent = '+';
+      plus.setAttribute('aria-label', '增加权重');
+      plus.addEventListener('click', () => changeWeight(index, 1));
+
+      controls.appendChild(minus);
+      controls.appendChild(weightVal);
+      controls.appendChild(plus);
+
+      // 删除
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '×';
+      del.setAttribute('aria-label', '删除 ' + food.name);
+      del.addEventListener('click', () => removeFood(index));
+
+      item.appendChild(name);
+      item.appendChild(percent);
+      item.appendChild(controls);
+      item.appendChild(del);
+      foodList.appendChild(item);
+    });
+  }
+
+  // ============ 增删改 ============
+  function addFood() {
+    const name = foodInput.value.trim();
+    if (!name) return;
+    if (foods.some(f => f.name === name)) {
+      foodInput.value = '';
+      foodInput.placeholder = '已经有了哦～';
+      setTimeout(() => { foodInput.placeholder = '输入食物名称...'; }, 1200);
+      return;
+    }
+    if (foods.length >= 20) {
+      foodInput.value = '';
+      foodInput.placeholder = '最多 20 项';
+      setTimeout(() => { foodInput.placeholder = '输入食物名称...'; }, 1200);
+      return;
+    }
+
+    foods.push({ name: name, weight: 1 });
+    foodInput.value = '';
+    foodInput.focus();
+
+    saveFoods();
+    renderList();
+    drawWheel();
+  }
+
+  function removeFood(index) {
+    foods.splice(index, 1);
+    saveFoods();
+    renderList();
+    drawWheel();
+  }
+
+  function changeWeight(index, delta) {
+    const food = foods[index];
+    const newWeight = food.weight + delta;
+    if (newWeight < 1 || newWeight > MAX_WEIGHT) return;
+
+    food.weight = newWeight;
+    saveFoods();
+    renderList();
+    drawWheel();
+  }
+
+  // ============ 事件 ============
+  spinBtn.addEventListener('click', spin);
+  addBtn.addEventListener('click', addFood);
+  foodInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addFood();
+    }
+  });
+  resultClose.addEventListener('click', hideResult);
+  resultOverlay.addEventListener('click', (e) => {
+    if (e.target === resultOverlay) hideResult();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) drawWheel();
+  });
+
+  // ============ 初始化 ============
+  renderList();
+  drawWheel();
+
+})();
+</script>
+</body>
+</html>
